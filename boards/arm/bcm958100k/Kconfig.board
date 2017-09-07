@@ -1,0 +1,4 @@
+
+config BOARD_BCM958100K
+	bool "bcm958100k"
+	depends on SOC_5810X

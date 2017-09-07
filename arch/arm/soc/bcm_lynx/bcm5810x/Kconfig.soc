@@ -1,0 +1,16 @@
+# Kconfig - Lynx SoC
+#
+# Copyright (c) 2017, Broadcom
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+choice
+prompt "Broadcom Lynx MCU Selection"
+depends on SOC_SERIES_LYNX
+
+config SOC_5810X
+	bool "SOC_5810X"
+	select CPU_CORTEX_M3
+
+endchoice

@@ -9,12 +9,6 @@ if BOARD_BCM958100K
 config BOARD
 	default bcm958100k
 
-config SRAM_BASE_ADDRESS
-	default 0x00000000
-
-config SRAM_SIZE
-	default 0
-
 if UART_NS16550
 
 config UART_NS16550_PORT_0

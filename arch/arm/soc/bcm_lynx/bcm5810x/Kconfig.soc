@@ -14,3 +14,11 @@ config SOC_5810X
 	select CPU_CORTEX_M3
 
 endchoice
+
+config ARM_MPU_ENABLE
+	bool "Enable MPU"
+	depends on CPU_HAS_MPU
+	select ARM_MPU
+	default n
+	help
+	  Enable MPU

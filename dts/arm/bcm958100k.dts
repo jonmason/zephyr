@@ -1,0 +1,168 @@
+/dts-v1/;
+
+#include <arm/armv7-m.dtsi>
+
+/ {
+	model = "Broadcom Lynx Cortex-M3";
+	compatible = "brcm,lynx";
+
+	aliases {
+		uart_0 = &uart0;
+		uart_1 = &uart1;
+		uart_2 = &uart2;
+		uart_3 = &uart3;
+	};
+
+	chosen {
+		zephyr,sram = &sram0;
+		zephyr,console = &uart0;
+		zephyr,flash = &flash0;
+	};
+
+	cpus {
+		cpu@0 {
+			compatible = "arm,cortex-m3";
+		};
+	};
+
+	sram0: memory {
+		compatible = "sram";
+		reg = <0x14000000 (512*1024)>;
+	};
+
+	//QSPI? or different
+	flash0: flash {
+		reg = <0x00000000 (256*1024)>;
+	};
+
+	soc {
+		//DMA
+		dma0: dma@51000000 {
+			reg = <0x51000000 0x1000000>;
+		};
+
+		//SMAU
+		smau@50000000 {
+			reg = <0x50000000 0x1000000>;
+		};
+
+		//USB
+		usbd: usb@47000000 {
+			reg = <0x47000000 0x1000000>;
+		};
+
+		usbh: usb@46000000 {
+			reg = <0x46000000 0x1000000>;
+		};
+
+		//RNG
+		rng0: rng@45220000 {
+			reg = <0x45220000 0x10000>;
+		};
+
+		//SCI
+		sci0: sci@4513000 {
+			reg = <0x45130000 0x10000>;
+		}; 
+
+		//QSPI
+		qspi0: spi@45110000 {
+			reg = <0x45110000 0x10000>;
+		};
+
+		//Timer
+		tmr23: timer@4505000 {
+			reg = <0x45050000 0x10000>;
+		};
+
+		tmr12: timer@4504000 {
+			reg = <0x45040000 0x10000>;
+		};
+
+		//GPIO
+		gpio0: gpio@4503000 {
+			reg = <0x45030000 0x10000>;
+		};
+
+		//MDIO
+		mdio0: mdio@440d000 {
+			reg = <0x440d0000 0x10000>;
+		};
+
+		//ADC
+		adc@440c0000 {
+			reg = <0x440c0000 0x10000>;
+		};
+
+		//FSK
+		fsk@440b0000 {
+			reg = <0x440b0000 0x10000>;
+		};
+
+		//PWM
+		pwm0: pwm@440a0000 {
+			reg = <0x440a0000 0x10000>;
+		};
+
+		//WDT
+		wdt0: watchdog@44090000 {
+			reg = <0x44090000 0x10000>;
+		};
+
+		//SPI
+		spi1: spi@44080000 {
+			reg = <0x44080000 0x10000>;
+		};
+
+		spi2: spi@44070000 {
+			reg = <0x44070000 0x10000>;
+		};
+
+		spi3: spi@44060000 {
+			reg = <0x44060000 0x10000>;
+		};
+
+		spi4: spi@44050000 {
+			reg = <0x44050000 0x10000>;
+		};
+
+		spi5: spi@44040000 {
+			reg = <0x44040000 0x10000>;
+		};
+
+		//UART
+		uart0: serial@44030000 {
+			//FIXME - ns16550 isn't DT aware 
+			compatible = "ns16550";
+			//compatible = "ti,stellaris-uart";
+			reg = <0x44030000 0x10000>;
+			current-speed = <115200>;
+			label = "UART_0";
+		};
+
+		uart1: serial@44020000 {
+			reg = <0x44020000 0x10000>;
+			current-speed = <115200>;
+			label = "UART_1";
+		};
+
+		uart2: serial@44010000 {
+			reg = <0x44010000 0x10000>;
+			current-speed = <115200>;
+			label = "UART_2";
+		};
+
+		uart3: serial@44000000 {
+			reg = <0x44000000 0x10000>;
+			current-speed = <115200>;
+			label = "UART_3";
+		};
+		//SMBUS
+		//NFC
+		//Smartcard
+	};
+};
+
+&nvic {
+	arm,num-irq-priority-bits = <7>;
+};

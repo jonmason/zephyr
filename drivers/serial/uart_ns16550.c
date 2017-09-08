@@ -191,12 +191,17 @@
 #define IIRC(dev) (DEV_DATA(dev)->iir_cache)
 
 #ifdef UART_NS16550_ACCESS_IOPORT
-#define INBYTE(x) sys_in8(x)
-#define OUTBYTE(x, d) sys_out8(d, x)
+#define READ(x) sys_in8(x)
+#define WRITE(x, d) sys_out8(d, x)
 #define UART_REG_ADDR_INTERVAL 1 /* address diff of adjacent regs. */
 #else
-#define INBYTE(x) sys_read8(x)
-#define OUTBYTE(x, d) sys_write8(d, x)
+#if 0
+#define READ(x) sys_read8(x)
+#define WRITE(x, d) sys_write8(d, x)
+#else
+#define READ(x) (*(volatile unsigned int *)(x))
+#define WRITE(x, d) *(volatile unsigned int *)(x) = (d)
+#endif
 #define UART_REG_ADDR_INTERVAL 4 /* address diff of adjacent regs. */
 #endif /* UART_NS16550_ACCESS_IOPORT */
 
@@ -236,7 +241,7 @@ static inline void set_dlf(struct device *dev, u32_t val)
 {
 	struct uart_ns16550_dev_data_t * const dev_data = DEV_DATA(dev);
 
-	OUTBYTE(DLF(dev), val);
+	WRITE(DLF(dev), val);
 	dev_data->dlf = val;
 }
 #endif
@@ -253,13 +258,13 @@ static void set_baud_rate(struct device *dev, u32_t baud_rate)
 		divisor = (dev_cfg->sys_clk_freq / baud_rate) >> 4;
 
 		/* set the DLAB to access the baud rate divisor registers */
-		lcr_cache = INBYTE(LCR(dev));
-		OUTBYTE(LCR(dev), LCR_DLAB);
-		OUTBYTE(BRDL(dev), (unsigned char)(divisor & 0xff));
-		OUTBYTE(BRDH(dev), (unsigned char)((divisor >> 8) & 0xff));
+		lcr_cache = READ(LCR(dev));
+		WRITE(LCR(dev), LCR_DLAB);
+		WRITE(BRDL(dev), (unsigned char)(divisor & 0xff));
+		WRITE(BRDH(dev), (unsigned char)((divisor >> 8) & 0xff));
 
 		/* restore the DLAB to access the baud rate divisor registers */
-		OUTBYTE(LCR(dev), lcr_cache);
+		WRITE(LCR(dev), lcr_cache);
 
 		dev_data->baud_rate = baud_rate;
 	}
@@ -329,20 +334,20 @@ static int uart_ns16550_init(struct device *dev)
 #endif
 
 	/* 8 data bits, 1 stop bit, no parity, clear DLAB */
-	OUTBYTE(LCR(dev), LCR_CS8 | LCR_1_STB | LCR_PDIS);
+	WRITE(LCR(dev), LCR_CS8 | LCR_1_STB | LCR_PDIS);
 
 	mdc = MCR_OUT2 | MCR_RTS | MCR_DTR;
 	if ((dev_data->options & UART_OPTION_AFCE) == UART_OPTION_AFCE)
 		mdc |= MCR_AFCE;
 
-	OUTBYTE(MDC(dev), mdc);
+	WRITE(MDC(dev), mdc);
 
 	/*
 	 * Program FIFO: enabled, mode 0 (set for compatibility with quark),
 	 * generate the interrupt at 8th byte
 	 * Clear TX and RX FIFO
 	 */
-	OUTBYTE(FCR(dev),
+	WRITE(FCR(dev),
 		FCR_FIFO | FCR_MODE0 | FCR_FIFO_8 | FCR_RCVRCLR | FCR_XMITCLR
 #ifdef CONFIG_UART_NS16750
 		| FCR_FIFO_64
@@ -350,10 +355,10 @@ static int uart_ns16550_init(struct device *dev)
 		);
 
 	/* clear the port */
-	INBYTE(RDR(dev));
+	READ(RDR(dev));
 
 	/* disable interrupts  */
-	OUTBYTE(IER(dev), 0x00);
+	WRITE(IER(dev), 0x00);
 
 	irq_unlock(old_level);
 
@@ -374,11 +379,11 @@ static int uart_ns16550_init(struct device *dev)
  */
 static int uart_ns16550_poll_in(struct device *dev, unsigned char *c)
 {
-	if ((INBYTE(LSR(dev)) & LSR_RXRDY) == 0x00)
+	if ((READ(LSR(dev)) & LSR_RXRDY) == 0x00)
 		return (-1);
 
 	/* got a character */
-	*c = INBYTE(RDR(dev));
+	*c = READ(RDR(dev));
 
 	return 0;
 }
@@ -401,10 +406,10 @@ static unsigned char uart_ns16550_poll_out(struct device *dev,
 					   unsigned char c)
 {
 	/* wait for transmitter to ready to accept a character */
-	while ((INBYTE(LSR(dev)) & LSR_TEMT) == 0)
+	while ((READ(LSR(dev)) & LSR_TEMT) == 0)
 		;
 
-	OUTBYTE(THR(dev), c);
+	WRITE(THR(dev), c);
 
 	return c;
 }
@@ -419,7 +424,7 @@ static unsigned char uart_ns16550_poll_out(struct device *dev,
  */
 static int uart_ns16550_err_check(struct device *dev)
 {
-	return (INBYTE(LSR(dev)) & LSR_EOB_MASK) >> 1;
+	return (READ(LSR(dev)) & LSR_EOB_MASK) >> 1;
 }
 
 #if CONFIG_UART_INTERRUPT_DRIVEN
@@ -438,8 +443,8 @@ static int uart_ns16550_fifo_fill(struct device *dev, const u8_t *tx_data,
 {
 	int i;
 
-	for (i = 0; i < size && (INBYTE(LSR(dev)) & LSR_THRE) != 0; i++) {
-		OUTBYTE(THR(dev), tx_data[i]);
+	for (i = 0; i < size && (READ(LSR(dev)) & LSR_THRE) != 0; i++) {
+		WRITE(THR(dev), tx_data[i]);
 	}
 	return i;
 }
@@ -458,8 +463,8 @@ static int uart_ns16550_fifo_read(struct device *dev, u8_t *rx_data,
 {
 	int i;
 
-	for (i = 0; i < size && (INBYTE(LSR(dev)) & LSR_RXRDY) != 0; i++) {
-		rx_data[i] = INBYTE(RDR(dev));
+	for (i = 0; i < size && (READ(LSR(dev)) & LSR_RXRDY) != 0; i++) {
+		rx_data[i] = READ(RDR(dev));
 	}
 
 	return i;
@@ -474,7 +479,7 @@ static int uart_ns16550_fifo_read(struct device *dev, u8_t *rx_data,
  */
 static void uart_ns16550_irq_tx_enable(struct device *dev)
 {
-	OUTBYTE(IER(dev), INBYTE(IER(dev)) | IER_TBE);
+	WRITE(IER(dev), READ(IER(dev)) | IER_TBE);
 }
 
 /**
@@ -486,7 +491,7 @@ static void uart_ns16550_irq_tx_enable(struct device *dev)
  */
 static void uart_ns16550_irq_tx_disable(struct device *dev)
 {
-	OUTBYTE(IER(dev), INBYTE(IER(dev)) & (~IER_TBE));
+	WRITE(IER(dev), READ(IER(dev)) & (~IER_TBE));
 }
 
 /**
@@ -510,7 +515,7 @@ static int uart_ns16550_irq_tx_ready(struct device *dev)
  */
 static int uart_ns16550_irq_tx_complete(struct device *dev)
 {
-	return (INBYTE(LSR(dev)) & (LSR_TEMT | LSR_THRE)) == (LSR_TEMT | LSR_THRE);
+	return (READ(LSR(dev)) & (LSR_TEMT | LSR_THRE)) == (LSR_TEMT | LSR_THRE);
 }
 
 /**
@@ -522,7 +527,7 @@ static int uart_ns16550_irq_tx_complete(struct device *dev)
  */
 static void uart_ns16550_irq_rx_enable(struct device *dev)
 {
-	OUTBYTE(IER(dev), INBYTE(IER(dev)) | IER_RXRDY);
+	WRITE(IER(dev), READ(IER(dev)) | IER_RXRDY);
 }
 
 /**
@@ -534,7 +539,7 @@ static void uart_ns16550_irq_rx_enable(struct device *dev)
  */
 static void uart_ns16550_irq_rx_disable(struct device *dev)
 {
-	OUTBYTE(IER(dev), INBYTE(IER(dev)) & (~IER_RXRDY));
+	WRITE(IER(dev), READ(IER(dev)) & (~IER_RXRDY));
 }
 
 /**
@@ -558,7 +563,7 @@ static int uart_ns16550_irq_rx_ready(struct device *dev)
  */
 static void uart_ns16550_irq_err_enable(struct device *dev)
 {
-	OUTBYTE(IER(dev), INBYTE(IER(dev)) | IER_LSR);
+	WRITE(IER(dev), READ(IER(dev)) | IER_LSR);
 }
 
 /**
@@ -570,7 +575,7 @@ static void uart_ns16550_irq_err_enable(struct device *dev)
  */
 static void uart_ns16550_irq_err_disable(struct device *dev)
 {
-	OUTBYTE(IER(dev), INBYTE(IER(dev)) & (~IER_LSR));
+	WRITE(IER(dev), READ(IER(dev)) & (~IER_LSR));
 }
 
 /**
@@ -594,7 +599,7 @@ static int uart_ns16550_irq_is_pending(struct device *dev)
  */
 static int uart_ns16550_irq_update(struct device *dev)
 {
-	IIRC(dev) = INBYTE(IIR(dev));
+	IIRC(dev) = READ(IIR(dev));
 
 	return 1;
 }
@@ -659,7 +664,7 @@ static int uart_ns16550_line_ctrl_set(struct device *dev,
 
 	case LINE_CTRL_RTS:
 	case LINE_CTRL_DTR:
-		mdc = INBYTE(MDC(dev));
+		mdc = READ(MDC(dev));
 
 		if (ctrl == LINE_CTRL_RTS) {
 			chg = MCR_RTS;
@@ -672,7 +677,7 @@ static int uart_ns16550_line_ctrl_set(struct device *dev,
 		} else {
 			mdc &= ~(chg);
 		}
-		OUTBYTE(MDC(dev), mdc);
+		WRITE(MDC(dev), mdc);
 		return 0;
 	}
 
